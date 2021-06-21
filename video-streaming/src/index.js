@@ -1,7 +1,7 @@
 //src: https://github.com/bootstrapping-microservices
 
 const express = require('express');
-const fs = require('fs');
+const http = require('http');
 
 const app = express();
 
@@ -10,32 +10,27 @@ if(!process.env.PORT) {
 }
 
 const port = process.env.PORT;
+const VIDEO_STORAGE_HOST= process.env.VIDEO_STORAGE_HOST;
+const VIDEO_STORAGE_PORT = parseInt(process.env.VIDEO_STORAGE_PORT);
 
 app.get("/", (req, res) => {
     res.send('Hello World!\n');
 });
 
 app.get("/video", (req, res) => {
-
-     //
-    // Original video from here:
-    // https://sample-videos.com
-    //
-    const path = "videos/SampleVideo_1280x720_1mb.mp4";
-    fs.stat(path, (err, stats) => {
-        if(err) {
-            console.error(`An error occurred\n${err}`);
-            res.sendStatus(500);
-            return;
-        } 
-
-        res.writeHead(200, {
-           "Content-Length": stats.size,
-           "Content-Type": "video/mp4", 
-        });
-
-        fs.createReadStream(path).pipe(res);
+    const forwardRequest = http.request({
+        host: VIDEO_STORAGE_HOST,
+        port: VIDEO_STORAGE_PORT,
+        path: "/video?path=SampleVideo_1280x720_1mb.mp4",
+        method: "GET",
+        headers: req.headers
+    },
+    forwardResponse => {
+        res.writeHeader(forwardResponse.statusCode, forwardResponse.headers);
+        forwardResponse.pipe(res);
     });
+
+    req.pipe(forwardRequest);
 });
 
 
