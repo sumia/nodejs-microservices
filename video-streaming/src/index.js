@@ -1,71 +1,46 @@
-//src: https://github.com/bootstrapping-microservices
+const express = require('express')
+const fs = require('fs')
 
-const express = require('express');
-const http = require('http');
-const mongodb = require('mongodb');
+function setupHandlers(app) {
+    app.get("/", (req, res) => {
+        const videoPath = "./videos/SampleVideo_1280x720_1mb.mp4";
+        fs.stat(videoPath, (err, stats) => {
+            if(err) {
+                console.log("An error occurred");
+                res.sendStatus(500);
+                return;
+            }
 
-const app = express();
-
-if(!process.env.PORT) {
-    throw new Error("Please specify the port number for the HTTP server with the environemnt variable PORT.");
-}
-
-const PORT = process.env.PORT;
-const VIDEO_STORAGE_HOST= process.env.VIDEO_STORAGE_HOST;
-const VIDEO_STORAGE_PORT = parseInt(process.env.VIDEO_STORAGE_PORT);
-const DBHOST = process.env.DBHOST;
-const DBNAME = process.env.DBNAME;
-
-function main()
-{
-    return mongodb.MongoClient.connect(DBHOST)
-        .then(client => {
-            const db = client.db(DBNAME);
-            const videosCollection = db.collection("videos");
-            
-            app.get("/video", (req, res) => {
-                const videoId = new mongodb.ObjectID(req.query.id);
-                    videosCollection.findOne({ _id: videoId })
-                    .then(videoRecord => {
-                        if(!videoRecord) {
-                            res.sendStatus(404);
-                            return;
-                        }
-                        
-                        console.log(`Translated id ${videoId} to path ${videoRecord.videoPath}.`);
-
-                        const forwardRequest = http.request(
-                            {
-                                host: VIDEO_STORAGE_HOST,
-                                port: VIDEO_STORAGE_PORT,
-                                path: `/video?path=${videoRecord.videoPath}`,
-                                method: 'GET',
-                                headers: req.headers
-                            },
-                            forwardResponse => {
-                                res.writeHeader(forwardResponse.statusCode, forwardResponse.headers);
-                                forwardResponse.pipe(res);
-                            }
-                        );      
-
-                        req.pipe(forwardRequest);
-                    })
-                    .catch(err => {
-                        console.error("Database query failed.");
-                        console.error(err && err.stack || err);
-                        res.sendStatus(500);
-                    });
+            res.writeHead(200, {
+                "Content-Length":   stats.size,
+                "Content-Type": "video/mp4"
             });
 
-            app.listen(PORT, () => {
-                console.log("Microservice listening.");
-            });
+            fs.createReadStream(videoPath).pipe(res);
         });
+    });
 }
+
+function startHttpServer() {
+    return new Promise((resolve, reject) => {
+        const app = express();
+        setupHandlers(app);
+
+        const port = process.env.PORT && parseInt(process.env.PORT) || 3000;
+        app.listen(port, () => {
+            resolve();
+        });
+    });
+}
+
+function main() {
+    return startHttpServer();
+}
+
 
 main()
-    .then(() => console.log("Microservice online"))
+    .then(() => console.log("Microservice online."))
     .catch(err => {
-        console.error("Microservice failed to start");
+        console.error("Microservice failed to start.");
         console.error(err && err.stack || err);
     });
