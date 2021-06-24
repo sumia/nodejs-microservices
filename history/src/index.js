@@ -18,7 +18,7 @@ function startHttpServer() {
 }
 
 function main() {
-    console.log("Hello world!");
+    console.log("Hello computer!");
     return startHttpServer();
 }
 
